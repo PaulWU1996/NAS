@@ -34,30 +34,59 @@ def filter(type: str, file: str) -> bool:
 
 def file_traceover(folder_path: str, filter_option: Optional[str] = None) -> List[dict]:
     """File Traceover
+    
+    album tree:
+    /root
+        /album
+            /image
 
-    This function traces all files in a given folder and its subfolders.
+    video tree:
+    /root
+        /series
+            /video
 
     Args:
-        folder_path (str): _description_
+        folder_path (str): 要扫描的根目录
+        filter_option (str): 可选类型："video" 或 "album"
 
     Returns:
-        list: _description_
+        list: 包含 metadata 字典的列表
     """
     file_list = []
-    for root, dirs, files in os.walk(folder_path):
-        for file in files:
-            if filter_option is not None:
-                if filter(filter_option, file):
-                    file_list.append({
-                        "title": file.split('.')[0].upper() if len(file)==2 else file[:-(len(file.split(".")[-1])+1)],
-                        "path": os.path.join(root, file),
-                        "type": filter_option,
-                        "studio": root.split('/')[-2].upper(),
-                        "series": root.split('/')[-1].upper(),
-                    })
-            else:
-                file_list.append(file.split('.')[0].upper())
-    return file_list
+
+    if filter_option == "album":
+        for root, dirs, files in os.walk(folder_path):
+            for dir_name in dirs:
+                abs_path = os.path.join(root, dir_name)
+                metadata = {}
+                metadata["title"] = dir_name.split("-")[-1]
+                metadata["model"] = [dir_name.split("-")[0]] if len(dir_name.split("-")) > 1 else [""]
+                imgs = {}
+                for file in os.listdir(abs_path):
+                    if filter("image", file):
+                        imgs[file] = os.path.join(abs_path, file)
+                imgs = dict(sorted(imgs.items()))
+                metadata["imgs"] = imgs
+                metadata["path"] = abs_path
+                file_list.append(metadata)
+        return file_list
+
+
+    if filter_option == "video":
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                if filter_option is not None:
+                    if filter(filter_option, file):
+                        file_list.append({
+                            "title": file.split('.')[0].upper() if len(file)==2 else file[:-(len(file.split(".")[-1])+1)],
+                            "path": os.path.join(root, file),
+                            "type": filter_option,
+                            "studio": root.split('/')[-2].upper(),
+                            "series": root.split('/')[-1].upper(),
+                        })
+                else:
+                    file_list.append(file.split('.')[0].upper())
+        return file_list
 
 
 
@@ -76,10 +105,10 @@ if __name__ == "__main__":
     else:
         directory = "."
 
-    directory = "/Volumes/PRIVATE_COLLECTION/Bondage/Tyingart"
+    directory = "/Volumes/PRIVATE_COLLECTION/林韵瑜（Moon）Mai/林韵瑜捆绑相册"
     
-    vid_list = file_traceover(directory, filter_option="video")
-    print(vid_list[0])
+    entry_list = file_traceover(directory, filter_option="album")
+    print(len(entry_list))
 
     # files = get_all_files(directory)
     # for file in files:

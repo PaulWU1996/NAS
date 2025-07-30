@@ -233,6 +233,56 @@ def video_extract_metadata(url: str) -> dict:
     metadata["model"] = models if models else ""
     return metadata
 
+@log_call
+def model_extract_metadata(url: str) -> dict:
+    """
+    Extract metadata from a model URL.
+
+    Args:
+        url (str): The model URL to extract metadata from.
+
+    Returns:
+        dict: A dictionary containing the extracted metadata.
+    """
+    html = fetch_with_retry(url)
+    if not html:
+        raise ValueError(f"Failed to connect to {url}")
+    soup = BeautifulSoup(html, 'html.parser')
+
+    # 假设每个 model 是一个块（你可以按实际包裹结构调整）
+    for model_block in soup.select('.group-t-model-info'):
+        name_div = model_block.select_one('.field-name-field-model-name')
+        name = name_div.get_text(strip=True) if name_div else None
+
+        figure = None
+
+        for label_div in model_block.select('.field-label'):
+            label = label_div.get_text(strip=True)
+            
+            if label == 'Age:':
+                next_sibling = label_div.find_next_sibling(text=True)
+                age = next_sibling.strip() if next_sibling else None
+            
+            elif label == 'Figure:':
+                next_sibling = label_div.find_next_sibling(text=True)
+                figure = next_sibling.strip() if next_sibling else None
+
+        avatar_img = model_block.find_previous("div", class_="field-name-field-model-avatar")
+        poster_url = None
+        if avatar_img:
+            img_tag = avatar_img.find("img")
+            if img_tag and img_tag.has_attr("src"):
+                poster_url = img_tag["src"].split("?")[0] # 去掉查询参数
+                            
+
+        return{
+                "name": name,
+                "age": age,
+                "figure": figure or "",
+                "poster": poster_url or "",
+            }
+
+
 if __name__ == "__main__":
     # url = "https://tyingart.com/gallery/001076"
     # url = "https://tyingart.com/product/tac-005"
@@ -292,26 +342,60 @@ if __name__ == "__main__":
     # save_metadata(dict(sorted(metadata_dict.items())), "tyingart_web_retail_metadata.json")
 
     
+    # metadata_dict = {}
+    # start = 115# 13
+    # end = 116# 292 # 00200 new vol{}s 
+    # for i in range(start,end):
+    #     if i < 200:
+    #         url = f"https://tyingart.com/video/vol{i:03d}s"
+    #     else:
+    #         url = f"https://tyingart.com/video/{i:05d}"
+
+    #     if i == 115:
+    #         url = "https://tyingart.com/video/00115"  # Special case for vol115s
+
+    #     try:
+    #         metadata = video_extract_metadata(url)
+    #         metadata["code"] = f"VOL-{i:03d}"
+    #         metadata_dict[metadata["code"]] = metadata
+    #         print(f"Progress: {i}/{end-start} - {metadata['title']}")
+    #     except Exception as e:
+    #         print(f"Error processing {url}: {e}")
+    #         with open("failed_urls.txt", "a") as f:
+    #             f.write(f"{url}\n")
+                
+    # save_metadata(dict(sorted(metadata_dict.items())), "web_video_metadata.json")
+
+
+
+
+    URLPREFIX = "https://tyingart.com/model/"
+
+    from metadata import load_metadata, save_metadata
+    metadata = load_metadata("TYINGART_VID_LATEST.json")
+
+    model_list = []
+    for key, value in metadata.items():
+        models = value["model"]
+        for model in models:
+            if model not in model_list:
+                model_list.append(model)
+    model_list = sorted(model_list)
+
+    print(f"Total models: {len(model_list)}")
+
     metadata_dict = {}
-    start = 115# 13
-    end = 116# 292 # 00200 new vol{}s 
-    for i in range(start,end):
-        if i < 200:
-            url = f"https://tyingart.com/video/vol{i:03d}s"
-        else:
-            url = f"https://tyingart.com/video/{i:05d}"
 
-        if i == 115:
-            url = "https://tyingart.com/video/00115"  # Special case for vol115s
-
+    for model in model_list:
+        url = URLPREFIX + model.replace(" ", "-").lower()
         try:
-            metadata = video_extract_metadata(url)
-            metadata["code"] = f"VOL-{i:03d}"
-            metadata_dict[metadata["code"]] = metadata
-            print(f"Progress: {i}/{end-start} - {metadata['title']}")
+            model_info = model_extract_metadata(url)
+    
+            print(f"Processed: {model_info['name']}")
+            metadata_dict[model_info["name"]] = model_info
         except Exception as e:
             print(f"Error processing {url}: {e}")
-            with open("failed_urls.txt", "a") as f:
+            with open("failed_model_urls.txt", "a") as f:
                 f.write(f"{url}\n")
-                
-    save_metadata(dict(sorted(metadata_dict.items())), "web_video_metadata.json")
+
+    save_metadata(dict(sorted(metadata_dict.items())), "tyingart_model_metadata.json")

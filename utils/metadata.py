@@ -9,34 +9,40 @@ from typing import Optional
 # === Metadata Template ===
 
 video_metadata_template = {
-    "title": "",
-    "code": "",
-    "series": "",
-    "model": [], 
-    "studio": "",
-    "description": "",
-    "path": "",
-    "poster": "",
-    "tags": [],
-}
+        "title": "",
+        "description": "",
+        "keywords": [],
+        "studio": [],
+        "code": "",
+        "series": "",
+        "model": [],
+        "poster": "",
+        "path": ""
+    }
 
 album_metadata_template = {
     "title": "",
+    "description": "",
+    "keywords": [],
+    "code": "",
     "model": [],
     "studio": "",
+    "path": "",
+    "poster": "",
+    "imgs": {}
 }
 
 model_metadata_template = {
     "name": "",
-    "nickname": [],
+    "real_name": [],
     "studio": [],
     "ID": "",
     "SNS": [],
     "description": "",
     "comments": "",
-    "beauty": int,
-    "figure": int,
-    "leg": int,
+    "beauty_score": 0,
+    "figure_score": 0,
+    "leg_score": 0,
 }
 
 # === Metadata File Handling ===
@@ -87,7 +93,7 @@ def metadata_generator(metadata_type: str) -> dict:
     if metadata_type == "video":
         template = video_metadata_template.copy()
     elif metadata_type == "album":
-        template = ablum_metadata_template.copy()
+        template = album_metadata_template.copy()
     elif metadata_type == "model":
         template = model_metadata_template.copy()
     else:
@@ -118,101 +124,88 @@ def metadata_checker(metadata: dict, metadata_type: str) -> bool:
     return all(field in metadata and metadata[field] for field in required_fields)
 
 def metatadata_handler(original_metadata: dict, addition_metadata: Optional[dict], **kwargs) -> dict:
-    """Handle metadata by updating keys and values,
+    """Handle metadata by updating keys and values.
 
     Args:
-        original_metadata (dict): _description_
-        addition_metadata_type (str): _description_
-        **kwargs: Additional key-value pairs to update in the metadata.
+        original_metadata (dict): Base metadata to update.
+        addition_metadata (Optional[dict]): Incoming metadata to apply.
+        **kwargs: Additional key-value pairs to apply.
 
     Returns:
         dict: Updated metadata dictionary.
     """
-
     if addition_metadata is None:
         addition_metadata = {}
 
-    # Update original metadata with additional metadata
+    # Overwrite or add all keys from addition_metadata
     for key, value in addition_metadata.items():
-        if key in original_metadata:
-            original_metadata[key] = value
-    
-    # Update original metadata with keyword arguments
+        original_metadata[key] = value
+
+    # Overwrite or add all keys from kwargs
     for key, value in kwargs.items():
-        if key in original_metadata:
-            original_metadata[key] = value 
-    
+        original_metadata[key] = value
+
     return original_metadata
 
-if __name__ == "__main__":
-
-    # ty_web = load_metadata("tyingart_web_album_metadata.json")
+def metadata_sorted(metadata: dict) -> dict:
+    """
+    Sort metadata dictionary by keys.
     
-    # sorted_metadata = {int(k) if str(k).isdigit() else k: v for k, v in ty_web.items()}
-    # sorted_metadata = dict(sorted(sorted_metadata.items(), key=lambda x: x[0] if isinstance(x[0], int) else str(x[0])))
+    Args:
+        metadata (dict): Metadata dictionary to sort.
+    
+    Returns:
+        dict: Sorted metadata dictionary.
+    """
 
-    # save_metadata(sorted_metadata, "album_metadata.json")
+    return dict(sorted(metadata.items(), key=lambda item: item[0]))
 
-    # # Load both JSON files
-    # with open("tyingart_video_metadata.json", "r") as f:
-    #     addition_metadata = json.load(f)
+def metadata_merger(original_metadata: dict, addition_metadata: dict) -> dict:
+    """
+    Merge two metadata dictionaries.
+    
+    Args:
+        original_metadata (dict): Original metadata dictionary.
+        addition_metadata (dict): Additional metadata dictionary to merge.
+    
+    Returns:
+        dict: Merged metadata dictionary.
+    """
+    
+    merged_metadata = original_metadata.copy()
+    for key, value in addition_metadata.items():
+        if key in merged_metadata and isinstance(merged_metadata[key], list) and isinstance(value, list):
+            merged_metadata[key].extend(value)
+        else:
+            merged_metadata[key] = value
+    
+    return merged_metadata  
 
-    # with open("TYINGART_VID_LATEST.json", "r") as f:
-    #     original_metadata = json.load(f)
+if __name__ == "__main__":
+    pass
+    # model_metadata = load_metadata("tyingart_model_metadata.json")
 
-    # # Create a map from title to addition entry
-    # title_map = {v["title"]: v for v in addition_metadata.values()}
+    # for model_name, metadata in model_metadata.items():
+    #     template = metadata_generator("model")
+    #     model_metadata[model_name] = metadata_merger(template, metadata)
+    #     model_metadata[model_name]["studio"] = ["TYINGART"] 
 
-    # # Merge data
-    # for key, original in original_metadata.items():
-    #     code = original.get("code")
-    #     if not code:
-    #         continue
-    #     addition = title_map.get(code)
-    #     if addition:
-    #         # Merge desired fields if they exist in addition and are non-empty
-    #         for field in ["keywords", "description", "code", "model"]:
-    #             if field in addition and addition[field]:
-    #                 original[field] = addition[field]
+    # save_metadata(model_metadata, "TYINGART_MODEL_LATEST.json")
 
-    # # Save back to file
-    # with open("1.json", "w") as f:
-    #     json.dump(original_metadata, f, ensure_ascii=False, indent=4)
+    # directory = "/Volumes/PRIVATE_COLLECTION/林韵瑜（Moon）Mai/林韵瑜捆绑视频"
+    
+    # from file import file_traceover
+    # vid_list = file_traceover(directory, filter_option="video")
+    # print(vid_list)
 
-    # with open("TYINGART_VID_LATEST.json", "r") as f:
-    #     metadata = json.load(f)
+    # metadata_dict = {}
+    # for vid in vid_list:
+    #     metadata = metadata_generator("video")
+    #     metadata = metatadata_handler(metadata, vid)
+    #     metadata["studio"] = "TYINGART"
+    #     metadata["model"] = ["Mai"]
+    #     metadata_dict[metadata["title"]] = metadata
+    # save_metadata(metadata_sorted(metadata_dict), f"mai_metadata.json")
 
-    # # metadata = {v["code"]: v for k, v in metadata.items() if v["code"]!= ""}
-    # metadata = dict(sorted(metadata.items(), key=lambda x: x[0]))
-    # save_metadata(metadata, "TYINGART_VID_LATEST.json")
-
-
-    # Load both JSON files
-    with open("tyingart_video_metadata.json", "r") as f:
-        addition_metadata = json.load(f)
-
-    with open("TYINGART_VID_LATEST.json", "r") as f:
-        original_metadata = json.load(f)
-
-
-    # Merge data
-    for key, original in original_metadata.items():
-        code = original.get("code")
-        if not code:
-            continue
-        addition = addition_metadata.get(code)
-        if addition:
-            # Merge desired fields if they exist in addition and are non-empty
-            poster = addition.get("path")[:-3]
-            if os.path.exists(poster+"jpg"):
-                original["poster"] = poster+"jpg"
-            elif os.path.exists(poster+"jpeg"):
-                original["poster"] = poster+"jpeg"
-
-            for field in ["path"]:
-                if field in addition and addition[field]:
-                    original[field] = addition[field]
-
-    # Save back to file
-    with open("1.json", "w") as f:
-        json.dump(original_metadata, f, ensure_ascii=False, indent=4)
+    
+            
