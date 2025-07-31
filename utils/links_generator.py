@@ -67,45 +67,71 @@ def handle_album_entry(entry, output_dir, overwrite):
     # 处理图片软链接
     imgs = entry.get("imgs", {})
     sorted_items = []
-    for item in imgs.items():
+    for fname, meta in imgs.items():
         try:
-            sort_key = smart_numeric_sort_key(item[0])
-            sorted_items.append((sort_key, item))
-        except ValueError as e:
-            print(f"⚠️ 跳过无法排序的文件: {item[0]} - {e}")
+            sort_key = smart_numeric_sort_key(fname)
+            path_str = meta["path"] if isinstance(meta, dict) and "path" in meta else meta
+            sorted_items.append((sort_key, fname, path_str))
+        except (ValueError, KeyError, TypeError) as e:
+            print(f"⚠️ 跳过无法排序或无效的文件: {fname} - {e}")
     sorted_items.sort()
-    for i, (_, (fname, src_path)) in enumerate(sorted_items, 1):
-        if not Path(src_path).exists():
-            print(f"⚠️ 缺失图片文件: {src_path}")
+    for i, (_, fname, src_path) in enumerate(sorted_items, 1):
+        if isinstance(src_path, dict):
+            actual_src_path = src_path.get("path")
+        else:
+            actual_src_path = src_path
+        if not isinstance(actual_src_path, (str, bytes, os.PathLike)):
+            print(f"⚠️ 非法路径类型，跳过: {fname} - {actual_src_path}")
+            continue
+        src = Path(actual_src_path)
+        if not src.exists():
+            print(f"⚠️ 缺失图片文件: {actual_src_path}")
             continue
         target_name = f"{i:03d}{Path(fname).suffix.lower()}"
         link_path = entry_dir / target_name
         if link_path.exists():
             if overwrite and not link_path.is_file():
                 link_path.unlink()
-                os.symlink(src_path, link_path)
+                os.link(src, link_path)
                 print(f"♻️ 覆盖软链接: {link_path.name}")
             else:
                 print(f"⏭️ 已存在，跳过: {link_path.name}")
         else:
-            os.symlink(src_path, link_path)
+            os.link(src, link_path)
             print(f"🔗 创建软链接: {link_path.name}")
 
     # 处理封面 poster
-    poster_name = entry.get("poster")
-    if poster_name and poster_name in imgs:
-        poster_source = Path(imgs[poster_name])
-        poster_target = entry_dir / "poster.jpg"
+    poster_source = None
+    for fname, meta in imgs.items():
+        if isinstance(meta, dict) and meta.get("poster") is True:
+            poster_source = Path(meta.get("path"))
+            break
+
+    # 如果所有 imgs 的 poster 都是 false，则选第一个图作为临时 poster
+    if not poster_source and sorted_items:
+        first_src_path = sorted_items[0][2]
+        if isinstance(first_src_path, dict):
+            first_src_path = first_src_path.get("path")
+        if isinstance(first_src_path, (str, bytes, os.PathLike)):
+            poster_source = Path(first_src_path)
+            print(f"📌 自动选用第一张图作为 poster: {poster_source}")
+    
+    poster_target = entry_dir / "poster.jpg"
+    if poster_source:
         if poster_source.exists():
             if poster_target.exists():
                 if overwrite and not poster_target.is_file():
                     poster_target.unlink()
-                    shutil.copyfile(poster_source, poster_target)
+                    if poster_target.exists():
+                        poster_target.unlink()
+                    os.link(poster_source, poster_target)
                     print(f"♻️ 覆盖写入 poster.jpg")
                 else:
                     print(f"⏭️ 跳过已有 poster.jpg")
             else:
-                shutil.copyfile(poster_source, poster_target)
+                if poster_target.exists():
+                    poster_target.unlink()
+                os.link(poster_source, poster_target)
                 print(f"✅ poster.jpg 写入完成")
         else:
             print(f"⚠️ 指定的 poster 文件不存在: {poster_source}")
@@ -238,6 +264,25 @@ def handle_video_entry(entry, output_dir, overwrite):
             print(f"✅ poster复制完成: {poster_link.name}")
     else:
         print(f"⚠️ 找不到 poster（尝试 jpg/jpeg 均失败）: {poster_raw}")
+        # 使用 ffmpeg 从视频中截取封面图像
+        poster_candidate = entry_dir / "poster.jpg"
+        try:
+            import subprocess
+            result = subprocess.run([
+                "ffmpeg",
+                "-y",  # overwrite output file if it exists
+                "-ss", "00:00:37",  # seek to 37 seconds
+                "-i", str(video_target),
+                "-frames:v", "1",
+                "-q:v", "2",
+                str(poster_candidate)
+            ], capture_output=True, text=True)
+            if result.returncode == 0 and poster_candidate.exists():
+                print(f"🎞️ 自动从视频生成 poster: {poster_candidate.name}")
+            else:
+                print(f"⚠️ ffmpeg 截图失败: {result.stderr}")
+        except Exception as e:
+            print(f"❌ 自动生成 poster 失败: {e}")
 
     # nfo 文件
     description = entry.get("description", "").strip()
@@ -404,14 +449,18 @@ def handle_model_entry(entry, output_dir, overwrite):
 
 
 if __name__ == "__main__":
-    json_path = Path("mai_album_metadata.json")
-    output_dir = Path("/Volumes/PRIVATE_COLLECTION/jellyfin_links/albums")
+    # json_path = Path("/home/paulwu/NAS/mai_album_metadata_updated.json")
+    # output_dir = Path("/mnt/nas/jellyfin_links/albums")
+
+    json_path = Path("/home/paulwu/NAS/TYINGART_VID_LATEST.json")
+    output_dir = Path("/mnt/nas/jellyfin_links/videos")
+
     output_dir.mkdir(parents=True, exist_ok=True)
     with json_path.open(encoding="utf-8") as f:
         data = json.load(f)
     entries = [v for k, v in data.items()]
     print(f"共找到 {len(entries)} 个条目")
-    media_entry_generator(entries, output_dir, entry_type="album", overwrite=True)
+    media_entry_generator(entries, output_dir, entry_type="video", overwrite=True)
 
     # json_path = Path("TYINGART_MODEL_LATEST.json")
     # output_dir = Path("/Volumes/PRIVATE_COLLECTION/jellyfin_links/models")

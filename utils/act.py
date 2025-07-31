@@ -9,9 +9,9 @@ if __name__ == "__main__":
     # directory = "/Volumes/PRIVATE_COLLECTION/Bondage/Tyingart"
     # file_type = "video"
 
-    directory = "/Volumes/PRIVATE_COLLECTION/林韵瑜（Moon）Mai/林韵瑜捆绑相册"
+    directory = "/mnt/nas/林韵瑜（Moon）Mai/林韵瑜捆绑相册"
     file_type = "album"
-    output_file = "mai_album_metadata.json"
+    output_file = "/home/paulwu/NAS/mai_metadata.json"
 
     entry_list = file_traceover(directory, filter_option=file_type)
 

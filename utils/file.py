@@ -64,7 +64,9 @@ def file_traceover(folder_path: str, filter_option: Optional[str] = None) -> Lis
                 imgs = {}
                 for file in os.listdir(abs_path):
                     if filter("image", file):
-                        imgs[file] = os.path.join(abs_path, file)
+                        imgs[file] = {"path": os.path.join(abs_path, file),
+                                      "poster": False}
+
                 imgs = dict(sorted(imgs.items()))
                 metadata["imgs"] = imgs
                 metadata["path"] = abs_path

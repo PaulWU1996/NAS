@@ -182,7 +182,7 @@ def metadata_merger(original_metadata: dict, addition_metadata: dict) -> dict:
     return merged_metadata  
 
 if __name__ == "__main__":
-    pass
+    
     # model_metadata = load_metadata("tyingart_model_metadata.json")
 
     # for model_name, metadata in model_metadata.items():
@@ -207,5 +207,10 @@ if __name__ == "__main__":
     #     metadata_dict[metadata["title"]] = metadata
     # save_metadata(metadata_sorted(metadata_dict), f"mai_metadata.json")
 
-    
+    original_metadata = load_metadata("/home/paulwu/NAS/mai_album_metadata_updated.json")
+    addition_metadata = load_metadata("/home/paulwu/NAS/mai_metadata.json")
+
+    for key in original_metadata.keys():
+        original_metadata[key]["imgs"] = addition_metadata[key]["imgs"]
+    save_metadata(original_metadata, "/home/paulwu/NAS/mai_album_metadata_updated.json")
             
