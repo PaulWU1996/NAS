@@ -86,14 +86,16 @@ def load_metadata(file_path: str) -> dict:
 def normalize_key(title: str) -> str:
     """
     标准化 metadata 的 key 用于匹配，例如移除 # 前空格，统一引号，规范大小写等。
+    保留如 H-Cup 结构，不将其视为无效片段。
     """
     title = unicodedata.normalize("NFKC", title)
-    title = title.strip().lower()  # 不区分大小写
+    title = title.strip().lower()
     title = title.replace("‘", "'").replace("’", "'").replace("“", '"').replace("”", '"')
-    title = re.sub(r'\s+#', '#', title)  # #前空格去除
-    title = re.sub(r'[\u200b\u200e\u200f\u202a-\u202e]', '', title)  # 删除零宽字符
-    title = re.sub(r'\s*-\s*', ' - ', title)  # 统一短横线前后空格
-    title = re.sub(r'\s+', ' ', title)  # 多余空格合并
+    title = re.sub(r'(?<!\s)#', ' #', title)  # 补空格
+    title = re.sub(r'\s+#', '#', title)       # 去空格后统一为紧贴
+    title = re.sub(r'[\u200b\u200e\u200f\u202a-\u202e]', '', title)
+    title = re.sub(r'\s*-\s*', ' - ', title)
+    title = re.sub(r'(?<![a-z])\s+', ' ', title)
     return title
 
 def metadata_generator(metadata_type: str) -> dict:
@@ -210,6 +212,13 @@ if __name__ == "__main__":
         if norm_key in addition_map:
             matched_key = addition_map[norm_key]
             original_metadata[key] = metadata_merger(original_metadata[key], addition_metadata[matched_key])
+        else:
+            # 尝试 fallback：去掉 # 后内容再匹配
+            fallback_key = norm_key.split("#")[0].strip()
+            for norm_add, real_add in addition_map.items():
+                if fallback_key == norm_add or fallback_key in norm_add:
+                    original_metadata[key] = metadata_merger(original_metadata[key], addition_metadata[real_add])
+                    break
 
     save_metadata(original_metadata, "ty_album_metadata_updated.json")
 
