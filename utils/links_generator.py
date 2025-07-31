@@ -58,6 +58,8 @@ def handle_album_entry(entry, output_dir, overwrite):
     code = unicodedata.normalize("NFC", code)
     title = unicodedata.normalize("NFC", title or "")
     model = entry.get("model", "")
+    if isinstance(model, list):
+        model = ", ".join(model)
     model = unicodedata.normalize("NFC", model or "")
     base_name = code
     dir_name = f"{model} - {title} - {code}".strip()
@@ -449,18 +451,20 @@ def handle_model_entry(entry, output_dir, overwrite):
 
 
 if __name__ == "__main__":
-    # json_path = Path("/home/paulwu/NAS/mai_album_metadata_updated.json")
-    # output_dir = Path("/mnt/nas/jellyfin_links/albums")
+    json_path = Path("/home/paulwu/NAS/ty_album_metadata_updated.json")
+    output_dir = Path("/mnt/nas/jellyfin_links/albums")
 
-    json_path = Path("/home/paulwu/NAS/TYINGART_VID_LATEST.json")
-    output_dir = Path("/mnt/nas/jellyfin_links/videos")
+    # json_path = Path("/home/paulwu/NAS/TYINGART_VID_LATEST.json")
+    # output_dir = Path("/mnt/nas/jellyfin_links/videos")
+
+    entry_type = "album"  # 或 "album" 或 "model"
 
     output_dir.mkdir(parents=True, exist_ok=True)
     with json_path.open(encoding="utf-8") as f:
         data = json.load(f)
     entries = [v for k, v in data.items()]
     print(f"共找到 {len(entries)} 个条目")
-    media_entry_generator(entries, output_dir, entry_type="video", overwrite=True)
+    media_entry_generator(entries, output_dir, entry_type="album", overwrite=True)
 
     # json_path = Path("TYINGART_MODEL_LATEST.json")
     # output_dir = Path("/Volumes/PRIVATE_COLLECTION/jellyfin_links/models")
