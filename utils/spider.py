@@ -291,6 +291,15 @@ if __name__ == "__main__":
     # metadata = retail_extract_metadata(url)
     # print(metadata)
 
+    from metadata import save_metadata, load_metadata
+    data = load_metadata("tyingart_web_album_metadata.json")
+    exist_album = data.keys()
+    e1 = []
+    for a in exist_album:
+        e1.append(int(a))
+    e2 = [i for i in range(90, 1081)]
+    missing = set(e2) - set(e1)
+    print(f"Missing albums: {sorted(missing)}") # Missing albums: [765, 801, 829, 847, 864, 875, 887, 924, 982, 1063] 921
     # metadata_dict = {}
     # start = 90
     # end = 1081
@@ -311,6 +320,7 @@ if __name__ == "__main__":
 
     # save_metadata(dict(sorted(metadata_dict.items())), "tyingart_web_album_metadata.json")
 
+    
     # from metadata import load_metadata, save_metadata
 
     # retails = load_metadata("retail.json")
@@ -369,33 +379,33 @@ if __name__ == "__main__":
 
 
 
-    URLPREFIX = "https://tyingart.com/model/"
+    # URLPREFIX = "https://tyingart.com/model/"
 
-    from metadata import load_metadata, save_metadata
-    metadata = load_metadata("TYINGART_VID_LATEST.json")
+    # from metadata import load_metadata, save_metadata
+    # metadata = load_metadata("TYINGART_VID_LATEST.json")
 
-    model_list = []
-    for key, value in metadata.items():
-        models = value["model"]
-        for model in models:
-            if model not in model_list:
-                model_list.append(model)
-    model_list = sorted(model_list)
+    # model_list = []
+    # for key, value in metadata.items():
+    #     models = value["model"]
+    #     for model in models:
+    #         if model not in model_list:
+    #             model_list.append(model)
+    # model_list = sorted(model_list)
 
-    print(f"Total models: {len(model_list)}")
+    # print(f"Total models: {len(model_list)}")
 
-    metadata_dict = {}
+    # metadata_dict = {}
 
-    for model in model_list:
-        url = URLPREFIX + model.replace(" ", "-").lower()
-        try:
-            model_info = model_extract_metadata(url)
+    # for model in model_list:
+    #     url = URLPREFIX + model.replace(" ", "-").lower()
+    #     try:
+    #         model_info = model_extract_metadata(url)
     
-            print(f"Processed: {model_info['name']}")
-            metadata_dict[model_info["name"]] = model_info
-        except Exception as e:
-            print(f"Error processing {url}: {e}")
-            with open("failed_model_urls.txt", "a") as f:
-                f.write(f"{url}\n")
+    #         print(f"Processed: {model_info['name']}")
+    #         metadata_dict[model_info["name"]] = model_info
+    #     except Exception as e:
+    #         print(f"Error processing {url}: {e}")
+    #         with open("failed_model_urls.txt", "a") as f:
+    #             f.write(f"{url}\n")
 
-    save_metadata(dict(sorted(metadata_dict.items())), "tyingart_model_metadata.json")
+    # save_metadata(dict(sorted(metadata_dict.items())), "tyingart_model_metadata.json")

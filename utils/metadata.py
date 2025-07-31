@@ -220,6 +220,22 @@ if __name__ == "__main__":
                     original_metadata[key] = metadata_merger(original_metadata[key], addition_metadata[real_add])
                     break
 
+    # 自动补充缺失字段的条目（不止 code）
+    for key in original_metadata:
+        if not original_metadata[key].get("code", "").strip():
+            norm_key = normalize_key(key)
+            addition_key = addition_map.get(norm_key, None)
+            if not addition_key:
+                # 尝试 fallback 模式
+                fallback_key = norm_key.split("#")[0].strip()
+                for norm_add, real_add in addition_map.items():
+                    if fallback_key == norm_add or fallback_key in norm_add:
+                        addition_key = real_add
+                        break
+            if addition_key:
+                add_entry = addition_metadata.get(addition_key, {})
+                original_metadata[key] = metadata_merger(original_metadata[key], add_entry)
+
     save_metadata(original_metadata, "ty_album_metadata_updated.json")
 
     data = load_metadata("ty_album_metadata_updated.json")
@@ -230,5 +246,3 @@ if __name__ == "__main__":
             print(f"缺少 code 字段: {k}")
     print(len(data))
     print(f"共有 {i} 个条目缺少 code 字段")
-
-
