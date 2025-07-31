@@ -3,15 +3,27 @@ from pathlib import Path
 import os
 import re
 
-def smart_numeric_sort_key(filename: str):
-    match = re.search(r"[（(](\d+)[)）]", filename)
-    if match:
-        return int(match.group(1))
-    stem = Path(filename).stem
-    match2 = re.fullmatch(r"(\d+)\D*", stem)
-    if match2:
-        return int(match2.group(1))
-    raise ValueError(f"Unrecognized image filename format: {filename}")
+def smart_numeric_sort_key(name: str):
+    base = Path(name).stem
+
+    # 1. 括号内的数字 → 最高优先级
+    paren_match = re.search(r'\((\d+)\)', base)
+    if paren_match:
+        return int(paren_match.group(1))
+
+    # 2. 纯数字开头（没有括号）→ 第二优先级
+    pure_number_match = re.fullmatch(r'\d+', base)
+    if pure_number_match:
+        return int(pure_number_match.group(0))
+
+    # 3. 字母+数字（如 DSC089731）→ 提取数字部分
+    tail_number_match = re.search(r'(\d+)', base)
+    if tail_number_match:
+        return int(tail_number_match.group(1))
+
+    # 4. fallback → 字母排序
+    # return base.lower()
+    raise ValueError(f"Unrecognized image filename format: {name}")
 
 def convert_png_to_jpg(png_path: Path, jpg_path: Path):
     """
