@@ -476,7 +476,7 @@ if __name__ == "__main__":
         data = json.load(f)
     entries = [v for k, v in data.items()]
     print(f"共找到 {len(entries)} 个条目")
-    media_entry_generator(entries, output_dir, entry_type="album", overwrite=True)
+    media_entry_generator(entries, output_dir, entry_type="album", overwrite=False)
 
     # json_path = Path("TYINGART_MODEL_LATEST.json")
     # output_dir = Path("/Volumes/PRIVATE_COLLECTION/jellyfin_links/models")

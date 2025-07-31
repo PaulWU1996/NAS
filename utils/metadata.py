@@ -4,6 +4,8 @@ This module provides support for handling metadata
 
 import json
 import os
+import re
+import unicodedata
 from typing import Optional
 
 # === Metadata Template ===
@@ -79,6 +81,20 @@ def load_metadata(file_path: str) -> dict:
         return json.load(f)
 
 # === Metadata Functions ===
+
+# 新增：标准化 key 的工具函数
+def normalize_key(title: str) -> str:
+    """
+    标准化 metadata 的 key 用于匹配，例如移除 # 前空格，统一引号，规范大小写等。
+    """
+    title = unicodedata.normalize("NFKC", title)
+    title = title.strip().lower()  # 不区分大小写
+    title = title.replace("‘", "'").replace("’", "'").replace("“", '"').replace("”", '"')
+    title = re.sub(r'\s+#', '#', title)  # #前空格去除
+    title = re.sub(r'[\u200b\u200e\u200f\u202a-\u202e]', '', title)  # 删除零宽字符
+    title = re.sub(r'\s*-\s*', ' - ', title)  # 统一短横线前后空格
+    title = re.sub(r'\s+', ' ', title)  # 多余空格合并
+    return title
 
 def metadata_generator(metadata_type: str) -> dict:
     """
@@ -182,55 +198,28 @@ def metadata_merger(original_metadata: dict, addition_metadata: dict) -> dict:
     return merged_metadata  
 
 if __name__ == "__main__":
-    
-    # model_metadata = load_metadata("tyingart_model_metadata.json")
-
-    # for model_name, metadata in model_metadata.items():
-    #     template = metadata_generator("model")
-    #     model_metadata[model_name] = metadata_merger(template, metadata)
-    #     model_metadata[model_name]["studio"] = ["TYINGART"] 
-
-    # save_metadata(model_metadata, "TYINGART_MODEL_LATEST.json")
-
-    # directory = "/Volumes/PRIVATE_COLLECTION/林韵瑜（Moon）Mai/林韵瑜捆绑视频"
-    
-    # from file import file_traceover
-    # vid_list = file_traceover(directory, filter_option="video")
-    # print(vid_list)
-
-    # metadata_dict = {}
-    # for vid in vid_list:
-    #     metadata = metadata_generator("video")
-    #     metadata = metatadata_handler(metadata, vid)
-    #     metadata["studio"] = "TYINGART"
-    #     metadata["model"] = ["Mai"]
-    #     metadata_dict[metadata["title"]] = metadata
-    # save_metadata(metadata_sorted(metadata_dict), f"mai_metadata.json")
-
 
     original_metadata = load_metadata("tyingart_album_metadata_cleaned.json")
     addition_metadata = load_metadata("tyingart_web_album_metadata_cleaned.json")
 
-    for key in original_metadata.keys():
-        if key in addition_metadata.keys():
-            original_metadata[key] = metadata_merger(original_metadata[key], addition_metadata[key])
+    # 创建标准化后的键映射
+    addition_map = {normalize_key(k): k for k in addition_metadata}
+
+    for key in list(original_metadata.keys()):
+        norm_key = normalize_key(key)
+        if norm_key in addition_map:
+            matched_key = addition_map[norm_key]
+            original_metadata[key] = metadata_merger(original_metadata[key], addition_metadata[matched_key])
+
     save_metadata(original_metadata, "ty_album_metadata_updated.json")
 
+    data = load_metadata("ty_album_metadata_updated.json")
+    i = 0
+    for k, v in data.items():
+        if v["code"] == "":
+            i += 1
+            print(f"缺少 code 字段: {k}")
+    print(len(data))
+    print(f"共有 {i} 个条目缺少 code 字段")
 
-    # # Clean up the metadata 
-    # original_metadata = load_metadata("tyingart_web_album_metadata.json")
 
-    # processed_metadata = {}
-    # for key, metadata in original_metadata.items():
-    #         # if key.split("-")[0] != "":
-    #         #     processed_metadata[key] = metadata
-    #         if type(metadata["model"]) is list:
-    #             models = metadata["model"]
-    #             model = ""
-    #             for m in models:
-    #                 model += m + ", "
-    #             model = model[:-2]  # Remove the last comma and space 
-    #             processed_metadata["{}-{}".format(model, metadata["title"])] = metadata
-    #         elif type(metadata["model"]) is str:
-    #             processed_metadata["{}-{}".format(metadata["model"], metadata["title"])] = metadata
-    # save_metadata(processed_metadata, "tyingart_web_album_metadata_cleaned.json")
