@@ -207,10 +207,30 @@ if __name__ == "__main__":
     #     metadata_dict[metadata["title"]] = metadata
     # save_metadata(metadata_sorted(metadata_dict), f"mai_metadata.json")
 
-    original_metadata = load_metadata("/home/paulwu/NAS/mai_album_metadata_updated.json")
-    addition_metadata = load_metadata("/home/paulwu/NAS/mai_metadata.json")
+
+    original_metadata = load_metadata("tyingart_album_metadata_cleaned.json")
+    addition_metadata = load_metadata("tyingart_web_album_metadata_cleaned.json")
 
     for key in original_metadata.keys():
-        original_metadata[key]["imgs"] = addition_metadata[key]["imgs"]
-    save_metadata(original_metadata, "/home/paulwu/NAS/mai_album_metadata_updated.json")
-            
+        if key in addition_metadata.keys():
+            original_metadata[key] = metadata_merger(original_metadata[key], addition_metadata[key])
+    save_metadata(original_metadata, "ty_album_metadata_updated.json")
+
+
+    # # Clean up the metadata 
+    # original_metadata = load_metadata("tyingart_web_album_metadata.json")
+
+    # processed_metadata = {}
+    # for key, metadata in original_metadata.items():
+    #         # if key.split("-")[0] != "":
+    #         #     processed_metadata[key] = metadata
+    #         if type(metadata["model"]) is list:
+    #             models = metadata["model"]
+    #             model = ""
+    #             for m in models:
+    #                 model += m + ", "
+    #             model = model[:-2]  # Remove the last comma and space 
+    #             processed_metadata["{}-{}".format(model, metadata["title"])] = metadata
+    #         elif type(metadata["model"]) is str:
+    #             processed_metadata["{}-{}".format(metadata["model"], metadata["title"])] = metadata
+    # save_metadata(processed_metadata, "tyingart_web_album_metadata_cleaned.json")
