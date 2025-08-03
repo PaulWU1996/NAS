@@ -30,8 +30,13 @@ album_metadata_template = {
     "model": [],
     "studio": "",
     "path": "",
-    "poster": "",
+    "poster": "", 
     "imgs": {}
+}
+
+img_metadata_template = {
+    "path": "",
+    "poster": False
 }
 
 model_metadata_template = {
@@ -61,7 +66,7 @@ def save_metadata(metadata: dict, file_path: Optional[str]) -> None:
         pass
         # raise ValueError("File path cannot be None")
     
-    with open(file_path, 'w') as f:
+    with open(file_path, 'w') as f: # type: ignore
         json.dump(metadata, f, indent=4, ensure_ascii=False)
 
 def load_metadata(file_path: str) -> dict:
@@ -201,48 +206,52 @@ def metadata_merger(original_metadata: dict, addition_metadata: dict) -> dict:
 
 if __name__ == "__main__":
 
-    original_metadata = load_metadata("tyingart_album_metadata_cleaned.json")
-    addition_metadata = load_metadata("tyingart_web_album_metadata_cleaned.json")
+    # original_metadata = load_metadata("tyingart_album_metadata_cleaned.json")
+    # addition_metadata = load_metadata("tyingart_web_album_metadata_cleaned.json")
 
-    # 创建标准化后的键映射
-    addition_map = {normalize_key(k): k for k in addition_metadata}
+    # # 创建标准化后的键映射
+    # addition_map = {normalize_key(k): k for k in addition_metadata}
 
-    for key in list(original_metadata.keys()):
-        norm_key = normalize_key(key)
-        if norm_key in addition_map:
-            matched_key = addition_map[norm_key]
-            original_metadata[key] = metadata_merger(original_metadata[key], addition_metadata[matched_key])
-        else:
-            # 尝试 fallback：去掉 # 后内容再匹配
-            fallback_key = norm_key.split("#")[0].strip()
-            for norm_add, real_add in addition_map.items():
-                if fallback_key == norm_add or fallback_key in norm_add:
-                    original_metadata[key] = metadata_merger(original_metadata[key], addition_metadata[real_add])
-                    break
+    # for key in list(original_metadata.keys()):
+    #     norm_key = normalize_key(key)
+    #     if norm_key in addition_map:
+    #         matched_key = addition_map[norm_key]
+    #         original_metadata[key] = metadata_merger(original_metadata[key], addition_metadata[matched_key])
+    #     else:
+    #         # 尝试 fallback：去掉 # 后内容再匹配
+    #         fallback_key = norm_key.split("#")[0].strip()
+    #         for norm_add, real_add in addition_map.items():
+    #             if fallback_key == norm_add or fallback_key in norm_add:
+    #                 original_metadata[key] = metadata_merger(original_metadata[key], addition_metadata[real_add])
+    #                 break
 
-    # 自动补充缺失字段的条目（不止 code）
-    for key in original_metadata:
-        if not original_metadata[key].get("code", "").strip():
-            norm_key = normalize_key(key)
-            addition_key = addition_map.get(norm_key, None)
-            if not addition_key:
-                # 尝试 fallback 模式
-                fallback_key = norm_key.split("#")[0].strip()
-                for norm_add, real_add in addition_map.items():
-                    if fallback_key == norm_add or fallback_key in norm_add:
-                        addition_key = real_add
-                        break
-            if addition_key:
-                add_entry = addition_metadata.get(addition_key, {})
-                original_metadata[key] = metadata_merger(original_metadata[key], add_entry)
+    # # 自动补充缺失字段的条目（不止 code）
+    # for key in original_metadata:
+    #     if not original_metadata[key].get("code", "").strip():
+    #         norm_key = normalize_key(key)
+    #         addition_key = addition_map.get(norm_key, None)
+    #         if not addition_key:
+    #             # 尝试 fallback 模式
+    #             fallback_key = norm_key.split("#")[0].strip()
+    #             for norm_add, real_add in addition_map.items():
+    #                 if fallback_key == norm_add or fallback_key in norm_add:
+    #                     addition_key = real_add
+    #                     break
+    #         if addition_key:
+    #             add_entry = addition_metadata.get(addition_key, {})
+    #             original_metadata[key] = metadata_merger(original_metadata[key], add_entry)
 
-    save_metadata(original_metadata, "ty_album_metadata_updated.json")
+    # save_metadata(original_metadata, "ty_album_metadata_updated.json")
+
+    # data = load_metadata("ty_album_metadata_updated.json")
+    # i = 0
+    # for k, v in data.items():
+    #     if v["code"] == "":
+    #         i += 1
+    #         print(f"缺少 code 字段: {k}")
+    # print(len(data))
+    # print(f"共有 {i} 个条目缺少 code 字段")
+
 
     data = load_metadata("ty_album_metadata_updated.json")
-    i = 0
-    for k, v in data.items():
-        if v["code"] == "":
-            i += 1
-            print(f"缺少 code 字段: {k}")
-    print(len(data))
-    print(f"共有 {i} 个条目缺少 code 字段")
+    save_metadata(metadata_sorted(data), "album_metadata_updated.json")

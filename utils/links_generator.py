@@ -195,6 +195,90 @@ def handle_album_entry(entry, output_dir, overwrite):
             print(f"📝 album nfo 写入完成: {nfo_path.name}")
 
 
+def generate_movie_nfo_lines(entry: dict) -> list[str]:
+    from datetime import datetime
+    today = datetime.today().strftime('%Y-%m-%d')
+
+    code = entry.get("code", "")
+    title = entry.get("title", "")
+    description = entry.get("description", "").strip()
+    series = code.split("-")[0] if isinstance(code, str) and "-" in code else (code or "")
+    models = entry.get("model") or []
+    keywords = entry.get("keywords") or []
+
+    if isinstance(models, str):
+        models = [models]
+    if isinstance(keywords, str):
+        keywords = [keywords]
+
+    nfo_lines = [
+        "<movie>",
+        f"  <title>{code} - {title}</title>",
+        f"  <originaltitle>{code}</originaltitle>",
+        f"  <sorttitle>{code}</sorttitle>",
+        f"  <plot>{description}</plot>",
+        f"  <outline>{description}</outline>",
+        f"  <premiered>{today}</premiered>",
+        f"  <dateadded>{today}</dateadded>",
+        f"  <tag>{series}</tag>",
+    ]
+
+    optional_fields = {
+        "tagline": entry.get("tagline"),
+        "runtime": entry.get("runtime"),
+        "year": entry.get("year"),
+        "director": entry.get("director"),
+        "credits": entry.get("credits"),
+        "writer": entry.get("writer"),
+        "country": entry.get("country"),
+        "countrycode": entry.get("countrycode"),
+        "language": entry.get("language"),
+        "rating": entry.get("rating"),
+        "aspectratio": entry.get("aspectratio"),
+    }
+
+    for tag, value in optional_fields.items():
+        if value:
+            nfo_lines.append(f"  <{tag}>{value}</{tag}>")
+
+    for kw in keywords:
+        if kw:
+            nfo_lines.append(f"  <genre>{kw}</genre>")
+
+    for name in models:
+        if name:
+            nfo_lines.extend([
+                "  <actor>",
+                f"    <name>{name}</name>",
+                f"    <role>Model</role>",
+                "  </actor>"
+            ])
+
+    studios = entry.get("studio")
+    if studios:
+        if isinstance(studios, str):
+            studios = [studios]
+        for s in studios:
+            if s:
+                nfo_lines.append(f"  <studio>{s}</studio>")
+    
+    
+    prefix = code.split("-")[0]
+    if prefix and prefix != series:
+        nfo_lines.append(f"  <tag>{prefix}</tag>")
+
+    if entry.get("thumb") == "poster.jpg":
+        nfo_lines.append("  <thumb>poster.jpg</thumb>")
+
+    nfo_lines.extend([
+        f"  <uniqueid type=\"manual\">{code}</uniqueid>",
+        f"  <id>{code}</id>",
+        "  <lockdata>true</lockdata>",
+        "</movie>"
+    ])
+    return nfo_lines
+
+
 def handle_video_entry(entry, output_dir, overwrite):
     import unicodedata
     import shutil
@@ -247,7 +331,7 @@ def handle_video_entry(entry, output_dir, overwrite):
             f.write(str(video_target))
         print(f"✅ .strm 文件创建: {strm_path.name} → {video_target}")
 
-    # poster 软链接或复制
+    # poster 硬链接或复制
     poster_raw = entry.get("poster")
     print(f"🎯 poster_raw (原始): {poster_raw}")
     poster_source = None
@@ -269,7 +353,8 @@ def handle_video_entry(entry, output_dir, overwrite):
             if overwrite:
                 if not poster_link.is_file():
                     poster_link.unlink()
-                shutil.copyfile(poster_source, poster_link)
+                os.link(poster_source, poster_link)
+                # shutil.copyfile(poster_source, poster_link)
                 print(f"♻️ 覆盖写入 poster: {poster_link.name}")
             else:
                 print(f"⏭️ 跳过已有 poster: {poster_link.name}")
@@ -299,38 +384,12 @@ def handle_video_entry(entry, output_dir, overwrite):
             print(f"❌ 自动生成 poster 失败: {e}")
 
     # nfo 文件
-    description = entry.get("description", "").strip()
-    models = entry.get("model") or []
-    if isinstance(models, str):
-        models = [models]
-    keywords = entry.get("keywords") or []
-    if isinstance(keywords, str):
-        keywords = [keywords]
     nfo_path = entry_dir / f"{base_name}.nfo"
-    series = code.split("-")[0]
-    nfo_lines = [
-        "<movie>",
-        f"  <title>{code} - {title}</title>",
-        f"  <originaltitle>{code}</originaltitle>",
-        f"  <sorttitle>{code}</sorttitle>",
-        f"  <plot>{description}</plot>",
-        f"  <outline>{description}</outline>",
-        f"  <studio>TYINGART</studio>",
-        f"  <tag>{series}</tag>",
-    ]
-    for kw in keywords:
-        nfo_lines.append(f"  <genre>{kw}</genre>")
-    for name in models:
-        nfo_lines.extend([
-            "  <actor>",
-            f"    <name>{name}</name>",
-            f"    <role>Model</role>",
-            "  </actor>"
-        ])
-    if poster_link.exists():
-        nfo_lines.append(f"  <thumb>poster.jpg</thumb>")
-    nfo_lines.append(f"  <id>{code}</id>")
-    nfo_lines.append("</movie>")
+    # 生成 nfo_lines，自动判断 poster.jpg 是否存在
+    nfo_entry = dict(entry)
+    if (entry_dir / "poster.jpg").exists():
+        nfo_entry["thumb"] = "poster.jpg"
+    nfo_lines = generate_movie_nfo_lines(nfo_entry)
 
     if nfo_path.exists():
         if overwrite:
@@ -463,20 +522,20 @@ def handle_model_entry(entry, output_dir, overwrite):
 
 
 if __name__ == "__main__":
-    json_path = Path("/home/paulwu/NAS/ty_album_metadata_updated.json")
-    output_dir = Path("/mnt/nas/jellyfin_links/albums")
+    # json_path = Path("/home/paulwu/NAS/ty_album_metadata_updated.json")
+    # output_dir = Path("/mnt/nas/jellyfin_links/albums")
 
-    # json_path = Path("/home/paulwu/NAS/TYINGART_VID_LATEST.json")
-    # output_dir = Path("/mnt/nas/jellyfin_links/videos")
+    json_path = Path("/home/paulwu/NAS/gss_video_metadata.json")
+    output_dir = Path("/mnt/nas/jellyfin_links/bb_videos")
 
-    entry_type = "album"  # 或 "album" 或 "model"
+    entry_type = "video"  # video 或 "album" 或 "model"
 
     output_dir.mkdir(parents=True, exist_ok=True)
     with json_path.open(encoding="utf-8") as f:
         data = json.load(f)
     entries = [v for k, v in data.items()]
     print(f"共找到 {len(entries)} 个条目")
-    media_entry_generator(entries, output_dir, entry_type="album", overwrite=False)
+    media_entry_generator(entries, output_dir, entry_type=entry_type, overwrite=True)
 
     # json_path = Path("TYINGART_MODEL_LATEST.json")
     # output_dir = Path("/Volumes/PRIVATE_COLLECTION/jellyfin_links/models")

@@ -14,3 +14,11 @@ Ablum
 - Studio
     - Ablum
         - Title (File Name)
+
+Record:
+
+W**D (Pending for several resources & metadata)
+T**T (Pending for old metadata)
+S**C (Pending for metadata)
+N**T (Done)
+B**i (Done)
