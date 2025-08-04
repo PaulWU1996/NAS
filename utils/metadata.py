@@ -255,5 +255,8 @@ if __name__ == "__main__":
     # print(f"共有 {i} 个条目缺少 code 字段")
 
 
-    data = load_metadata("ty_album_metadata_updated.json")
-    save_metadata(metadata_sorted(data), "album_metadata_updated.json")
+    data = load_metadata("model_metadata.json")
+    new = {}
+    for k, v in data.items():
+        new[v['name']] = v
+    save_metadata(metadata_sorted(new), "model_metadata_updated.json")

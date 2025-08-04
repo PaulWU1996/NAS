@@ -7,7 +7,7 @@ import requests
 import re
 import json
 from bs4 import BeautifulSoup
-from metadata import load_metadata, save_metadata, metadata_sorted, model_metadata_template, video_metadata_template, album_metadata_template, img_metadata_template
+from json.TYINGART.web.metadata import load_metadata, save_metadata, metadata_sorted, model_metadata_template, video_metadata_template, album_metadata_template, img_metadata_template
 import time
 from requests.exceptions import RequestException
 from functools import wraps
@@ -88,7 +88,7 @@ def entry_extract_from_page(url: str, keywords:list, max_page: int=100,) -> list
             for s in keywords:
                 if str(href).startswith(s):
                     # print(txt)
-                    entries.append(f"{s}{txt.lower()}")
+                    entries.append(f"{href.lower()}")
 
     return entries
 
@@ -111,7 +111,8 @@ def album_extract_metadata(url: str) -> dict:
 
     title_tag = soup.find('meta', attrs={'property': 'og:title'})
     if title_tag and 'content' in title_tag.attrs:
-        metadata['title'] = " ".join(title_tag['content'].split()[1:-1]) 
+        metadata['title'] = " ".join(title_tag['content'].split()[1:-1])
+        metadata['code'] = title_tag['content'].split()[0].split(".")[-1] 
     else: 
         metadata['title'] =""
 
@@ -127,12 +128,12 @@ def album_extract_metadata(url: str) -> dict:
     else:
         metadata['keywords'] = []
 
-    code_tag = soup.find('meta', attrs={'property': 'og:url'})
-    if code_tag and 'content' in code_tag.attrs:
-        # Extract the code from the URL
-        metadata['code'] = code_tag['content'].split('/')[-1].upper()
-    else:
-        metadata['code'] = ""
+    # code_tag = soup.find('meta', attrs={'property': 'og:url'})
+    # if code_tag and 'content' in code_tag.attrs:
+    #     # Extract the code from the URL
+    #     metadata['code'] = code_tag['content'].split('/')[-1].upper()
+    # else:
+    #     metadata['code'] = ""
     
     # Find the section containing the model info
     model_div = soup.find("div", class_="field-name-taxonomy-vocabulary-2")
@@ -247,6 +248,11 @@ def video_extract_metadata(url: str) -> dict:
         # Extract the code from the URL
         metadata['code'] = code_tag['content'].split('/')[-1].upper()
     else:
+        # code = metadata["title"].split()[0].lower().split(".")[-1]
+        # if code[-1].lower() == "s":
+        #     metadata['code'] = code[:-1]
+        # else:
+        #     metadata['code'] = code
         metadata['code'] = ""
 
     # Step 1: Locate the block with the specific field class
@@ -325,7 +331,7 @@ def workflow_spider(website: str,
     
     Args:
         website (str): The base website URL. (Must include http:// or https://)
-        category (str): The category to scrape. (Can be a specific path like 'videos', 'albums', etc.)
+        category (str): The category to scrape. (Can be a specific path like 'video', 'albums', etc.)
         max_page (int): Maximum number of pages to scrape.
         keywords (list): List of keywords to filter entries. For example, ["/video/"], ["/gallery/], ["product", "retail"].
         etype (str): Type of entry to extract metadata for ('video', 'album', 'model').
@@ -334,7 +340,8 @@ def workflow_spider(website: str,
         None
     
     """
-
+    if website[-1] == "/":
+        website = website[:-1]
     url = f"{website}/{category}"
     # Step 1: Extract entries from pages
     entries = entry_extract_from_page(
@@ -342,6 +349,17 @@ def workflow_spider(website: str,
         keywords=keywords,
         max_page=max_page
     )
+    entries = set(entries)  # Remove duplicates
+    entries = list(entries)
+    
+    filter_entries = []
+    for entry in entries:
+        for keyword in keywords:
+            if entry.strip() == keyword:
+                filter_entries.append(entry)
+    filter_entries = set(filter_entries)  # Remove duplicates
+    entries = set(entries) - set(filter_entries)  # Remove filtered entries
+    entries = list(entries)
 
     data = {}
     i = 0
@@ -356,9 +374,12 @@ def workflow_spider(website: str,
             metadata = album_extract_metadata(entry_url)
         elif etype == "model":
             metadata = model_extract_metadata(entry_url)
+        elif etype == "retail":
+            metadata = retail_extract_metadata(entry_url)
         else:
             raise ValueError(f"Unsupported entry type: {etype}")
         data[i+1] = metadata
+        i += 1
         
 
     # Step 3: Save metadata to file
@@ -369,10 +390,10 @@ def workflow_spider(website: str,
 if __name__ == "__main__":
     # Example usage
     workflow_spider(
-        website="https://example.com",
-        category="videos",
-        max_page=10,
-        keywords=["/video/"],
-        etype="video",
-        output_file="video_metadata.json"
+        website="https://tyingart.com/",
+        category="gallery",
+        max_page= 35,
+        keywords=["/gallery/"],
+        etype="album",
+        output_file="album_metadata.json"
     )

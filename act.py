@@ -1,4 +1,4 @@
-from utils.metadata import metadata_generator, metatadata_handler, load_metadata, save_metadata, metadata_merger, metadata_sorted
+from json.TYINGART.web.metadata import metadata_generator, metatadata_handler, load_metadata, save_metadata, metadata_merger, metadata_sorted
 from utils.file import file_traceover
 
 def inspect(directory: str, output_file: str, file_type: str):
