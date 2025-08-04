@@ -7,7 +7,7 @@ import requests
 import re
 import json
 from bs4 import BeautifulSoup
-from metadata import save_metadata
+from metadata import save_metadata, model_metadata_template, video_metadata_template, album_metadata_template, img_metadata_template
 import time
 from requests.exceptions import RequestException
 from functools import wraps
@@ -234,6 +234,42 @@ def video_extract_metadata(url: str) -> dict:
     return metadata
 
 @log_call
+def models_etract_metadata(url: str) -> list:
+    """
+    Extract metadata from a models URL.
+
+    Args:
+        url (str): The models URL to extract metadata from.
+
+    Returns:
+        dict: A dictionary containing the extracted metadata.
+    """
+    
+    base_url = url + "?page="
+    max_page = 10
+    models = []
+
+    for p in range(max_page):
+        page_url = f"{base_url}{p}"
+        html = fetch_with_retry(page_url)
+        if not html:
+            raise ValueError(f"Failed to connect to {page_url}")
+        soup = BeautifulSoup(html, 'html.parser')
+
+        for link in soup.find_all("a"):
+            href = link.get('href')
+            txt = link.text
+
+            if str(href).startswith("/model/"):
+                # print(txt)
+                models.append(f"https://www.tyingart.com/model/{txt.lower()}")
+
+    return models
+
+
+
+
+@log_call
 def model_extract_metadata(url: str) -> dict:
     """
     Extract metadata from a model URL.
@@ -249,23 +285,25 @@ def model_extract_metadata(url: str) -> dict:
         raise ValueError(f"Failed to connect to {url}")
     soup = BeautifulSoup(html, 'html.parser')
 
+    info = model_metadata_template.copy()
+    info["name"] = url.split("/")[-1].title()  # Extract name from URL
+
     # 假设每个 model 是一个块（你可以按实际包裹结构调整）
     for model_block in soup.select('.group-t-model-info'):
         name_div = model_block.select_one('.field-name-field-model-name')
         name = name_div.get_text(strip=True) if name_div else None
 
-        figure = None
 
         for label_div in model_block.select('.field-label'):
             label = label_div.get_text(strip=True)
             
             if label == 'Age:':
                 next_sibling = label_div.find_next_sibling(text=True)
-                age = next_sibling.strip() if next_sibling else None
+                info["age"] = next_sibling.strip() if next_sibling else ""
             
             elif label == 'Figure:':
                 next_sibling = label_div.find_next_sibling(text=True)
-                figure = next_sibling.strip() if next_sibling else None
+                info["figure"] = next_sibling.strip() if next_sibling else None
 
         avatar_img = model_block.find_previous("div", class_="field-name-field-model-avatar")
         poster_url = None
@@ -273,14 +311,10 @@ def model_extract_metadata(url: str) -> dict:
             img_tag = avatar_img.find("img")
             if img_tag and img_tag.has_attr("src"):
                 poster_url = img_tag["src"].split("?")[0] # 去掉查询参数
+                info["poster"] = poster_url
                             
 
-        return{
-                "name": name,
-                "age": age,
-                "figure": figure or "",
-                "poster": poster_url or "",
-            }
+        return info
 
 
 if __name__ == "__main__":
@@ -291,15 +325,17 @@ if __name__ == "__main__":
     # metadata = retail_extract_metadata(url)
     # print(metadata)
 
-    from metadata import save_metadata, load_metadata
-    data = load_metadata("tyingart_web_album_metadata.json")
-    exist_album = data.keys()
-    e1 = []
-    for a in exist_album:
-        e1.append(int(a))
-    e2 = [i for i in range(90, 1081)]
-    missing = set(e2) - set(e1)
-    print(f"Missing albums: {sorted(missing)}") # Missing albums: [765, 801, 829, 847, 864, 875, 887, 924, 982, 1063] 921
+    # from metadata import save_metadata, load_metadata
+    # data = load_metadata("tyingart_web_album_metadata.json")
+    # exist_album = data.keys()
+    # e1 = []
+    # for a in exist_album:
+    #     e1.append(int(a))
+    # e2 = [i for i in range(90, 1081)]
+    # missing = set(e2) - set(e1)
+    # print(f"Missing albums: {sorted(missing)}") # Missing albums: [765, 801, 829, 847, 864, 875, 887, 924, 982, 1063] 921
+    
+    
     # metadata_dict = {}
     # start = 90
     # end = 1081
@@ -409,3 +445,19 @@ if __name__ == "__main__":
     #             f.write(f"{url}\n")
 
     # save_metadata(dict(sorted(metadata_dict.items())), "tyingart_model_metadata.json")
+
+    from metadata import load_metadata, save_metadata, metadata_sorted
+
+    models = models_etract_metadata("https://tyingart.com/models")
+    models = set(models)
+    models = list(models)
+    models.sort()
+    models.remove("https://www.tyingart.com/model/")
+
+    new = {}
+    for model in models:
+        model_info = model_extract_metadata(model)
+        print(model_info)
+        new[model_info["name"]] = model_info
+
+    save_metadata(metadata_sorted(new), "tyingart_model_metadata.json")

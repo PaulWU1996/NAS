@@ -261,11 +261,13 @@ def generate_movie_nfo_lines(entry: dict) -> list[str]:
         for s in studios:
             if s:
                 nfo_lines.append(f"  <studio>{s}</studio>")
+                nfo_lines.append(f"  <genre>{s}</genre>")
     
     
     prefix = code.split("-")[0]
     if prefix and prefix != series:
         nfo_lines.append(f"  <tag>{prefix}</tag>")
+        nfo_lines.append(f"  <genre>{prefix}</genre>")
 
     if entry.get("thumb") == "poster.jpg":
         nfo_lines.append("  <thumb>poster.jpg</thumb>")

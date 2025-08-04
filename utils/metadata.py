@@ -50,6 +50,8 @@ model_metadata_template = {
     "beauty_score": 0,
     "figure_score": 0,
     "leg_score": 0,
+    "age": "",
+    "poster": "",
 }
 
 # === Metadata File Handling ===
