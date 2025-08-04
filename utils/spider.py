@@ -7,7 +7,7 @@ import requests
 import re
 import json
 from bs4 import BeautifulSoup
-from metadata import save_metadata, model_metadata_template, video_metadata_template, album_metadata_template, img_metadata_template
+from metadata import load_metadata, save_metadata, metadata_sorted, model_metadata_template, video_metadata_template, album_metadata_template, img_metadata_template
 import time
 from requests.exceptions import RequestException
 from functools import wraps
@@ -57,6 +57,40 @@ def fetch_with_retry(url, retries=2, delay=5, timeout=5):
             else:
                 print(f"Failed to fetch {url} after {retries} attempts.")
                 return None
+@log_call
+def entry_extract_from_page(url: str, keywords:list, max_page: int=100,) -> list:
+    """
+    Extract entries list from a base URL.
+
+    Args:
+        url (str): The base URL to extract entries from.
+        keywords (list): Keywords to filter entries. For example, ["/model/"]
+        max_page (int): Maximum number of pages to scrape.
+
+    Returns:
+        list: A list containing the extracted metadata.
+    """
+    
+    base_url = url + "?page="
+    entries = []
+
+    for p in range(max_page):
+        page_url = f"{base_url}{p}"
+        html = fetch_with_retry(page_url)
+        if not html:
+            raise ValueError(f"Failed to connect to {page_url}")
+        soup = BeautifulSoup(html, 'html.parser')
+
+        for link in soup.find_all("a"):
+            href = link.get('href')
+            txt = link.text
+
+            for s in keywords:
+                if str(href).startswith(s):
+                    # print(txt)
+                    entries.append(f"{s}{txt.lower()}")
+
+    return entries
 
 @log_call
 def album_extract_metadata(url: str) -> dict:
@@ -73,7 +107,7 @@ def album_extract_metadata(url: str) -> dict:
     if not html:
         raise ValueError(f"Failed to connect to {url}")
     soup = BeautifulSoup(html, 'html.parser')
-    metadata = {}
+    metadata = album_metadata_template.copy()
 
     title_tag = soup.find('meta', attrs={'property': 'og:title'})
     if title_tag and 'content' in title_tag.attrs:
@@ -128,7 +162,7 @@ def retail_extract_metadata(url: str) -> dict:
     if not html:
         raise ValueError(f"Failed to connect to {url}")
     soup = BeautifulSoup(html, 'html.parser')
-    metadata = {}
+    metadata = video_metadata_template.copy()
 
     title_tag = soup.find('meta', attrs={'property': 'og:title'})
     if title_tag and 'content' in title_tag.attrs:
@@ -188,7 +222,7 @@ def video_extract_metadata(url: str) -> dict:
     if not html:
         raise ValueError(f"Failed to connect to {url}")
     soup = BeautifulSoup(html, 'html.parser')
-    metadata = {}
+    metadata = video_metadata_template.copy()
 
     title_tag = soup.find('meta', attrs={'property': 'og:title'})
     if title_tag and 'content' in title_tag.attrs:
@@ -234,42 +268,6 @@ def video_extract_metadata(url: str) -> dict:
     return metadata
 
 @log_call
-def models_etract_metadata(url: str) -> list:
-    """
-    Extract metadata from a models URL.
-
-    Args:
-        url (str): The models URL to extract metadata from.
-
-    Returns:
-        dict: A dictionary containing the extracted metadata.
-    """
-    
-    base_url = url + "?page="
-    max_page = 10
-    models = []
-
-    for p in range(max_page):
-        page_url = f"{base_url}{p}"
-        html = fetch_with_retry(page_url)
-        if not html:
-            raise ValueError(f"Failed to connect to {page_url}")
-        soup = BeautifulSoup(html, 'html.parser')
-
-        for link in soup.find_all("a"):
-            href = link.get('href')
-            txt = link.text
-
-            if str(href).startswith("/model/"):
-                # print(txt)
-                models.append(f"https://www.tyingart.com/model/{txt.lower()}")
-
-    return models
-
-
-
-
-@log_call
 def model_extract_metadata(url: str) -> dict:
     """
     Extract metadata from a model URL.
@@ -312,152 +310,69 @@ def model_extract_metadata(url: str) -> dict:
             if img_tag and img_tag.has_attr("src"):
                 poster_url = img_tag["src"].split("?")[0] # 去掉查询参数
                 info["poster"] = poster_url
-                            
-
+        
         return info
+
+def workflow_spider(website: str,
+                    category: str,
+                    max_page: int = 50,
+                    keywords: list = [],
+                    etype: str = "video",
+                    output_file: str = "metadata.json"
+                    ) -> None:
+    """
+    Main workflow for the spider to extract entries and metadata.
+    
+    Args:
+        website (str): The base website URL. (Must include http:// or https://)
+        category (str): The category to scrape. (Can be a specific path like 'videos', 'albums', etc.)
+        max_page (int): Maximum number of pages to scrape.
+        keywords (list): List of keywords to filter entries. For example, ["/video/"], ["/gallery/], ["product", "retail"].
+        etype (str): Type of entry to extract metadata for ('video', 'album', 'model').
+    
+    Returns:
+        None
+    
+    """
+
+    url = f"{website}/{category}"
+    # Step 1: Extract entries from pages
+    entries = entry_extract_from_page(
+        url=url,
+        keywords=keywords,
+        max_page=max_page
+    )
+
+    data = {}
+    i = 0
+    for entry in entries:
+        entry_url = f"{website}/{entry}"
+        print(f"Processing entry: {entry_url}")
+
+        # Step 2: Extract metadata based on type
+        if etype == "video":
+            metadata = video_extract_metadata(entry_url)
+        elif etype == "album":
+            metadata = album_extract_metadata(entry_url)
+        elif etype == "model":
+            metadata = model_extract_metadata(entry_url)
+        else:
+            raise ValueError(f"Unsupported entry type: {etype}")
+        data[i+1] = metadata
+        
+
+    # Step 3: Save metadata to file
+    save_metadata(metadata_sorted(data), output_file)
+    print(f"Metadata saved to {output_file}") 
 
 
 if __name__ == "__main__":
-    # url = "https://tyingart.com/gallery/001076"
-    # url = "https://tyingart.com/product/tac-005"
-
-    # metadata = album_extract_metadata(url)
-    # metadata = retail_extract_metadata(url)
-    # print(metadata)
-
-    # from metadata import save_metadata, load_metadata
-    # data = load_metadata("tyingart_web_album_metadata.json")
-    # exist_album = data.keys()
-    # e1 = []
-    # for a in exist_album:
-    #     e1.append(int(a))
-    # e2 = [i for i in range(90, 1081)]
-    # missing = set(e2) - set(e1)
-    # print(f"Missing albums: {sorted(missing)}") # Missing albums: [765, 801, 829, 847, 864, 875, 887, 924, 982, 1063] 921
-    
-    
-    # metadata_dict = {}
-    # start = 90
-    # end = 1081
-    # for i in range(start,end): 
-
-    #     if i < 1043:
-    #         url = f"https://tyingart.com/gallery/{i:05d}"
-    #     else:
-    #         url = f"https://tyingart.com/gallery/{i:06d}"
-    #     try:
-    #         metadata = album_extract_metadata(url)
-    #         metadata_dict[metadata["code"]] = metadata
-    #         print(f"Progress: {i}/{end-start} - {metadata['title']}")
-    #     except Exception as e:
-    #         print(f"Error processing {url}: {e}")
-    #         with open("failed_urls.txt", "a") as f:
-    #             f.write(f"{url}\n")
-
-    # save_metadata(dict(sorted(metadata_dict.items())), "tyingart_web_album_metadata.json")
-
-    
-    # from metadata import load_metadata, save_metadata
-
-    # retails = load_metadata("retail.json")
-    # metadata_dict = {}
-    # for code in retails.keys():
-
-    #     if code.startswith("SP-"):
-    #         code = "".join(code.split("-"))  # e.g., SP-001 -> SP-001
-
-    #     url1 = f"https://tyingart.com/product/{code}"
-    #     url2 = f"https://tyingart.com/retail/{code}"
-
-    #     try:
-    #         metadata = retail_extract_metadata(url1)
-    #         metadata_dict[metadata["code"]] = metadata
-    #         print(f"Processed: {code} - {metadata['title']}")
-    #         continue
-    #     except Exception as e:
-    #         pass
-
-    #     try:
-    #         metadata = retail_extract_metadata(url2)
-    #         metadata_dict[metadata["code"]] = metadata
-    #         print(f"Processed: {code} - {metadata['title']}")
-    #         continue
-    #     except Exception as e:
-    #         pass
-
-    # save_metadata(dict(sorted(metadata_dict.items())), "tyingart_web_retail_metadata.json")
-
-    
-    # metadata_dict = {}
-    # start = 115# 13
-    # end = 116# 292 # 00200 new vol{}s 
-    # for i in range(start,end):
-    #     if i < 200:
-    #         url = f"https://tyingart.com/video/vol{i:03d}s"
-    #     else:
-    #         url = f"https://tyingart.com/video/{i:05d}"
-
-    #     if i == 115:
-    #         url = "https://tyingart.com/video/00115"  # Special case for vol115s
-
-    #     try:
-    #         metadata = video_extract_metadata(url)
-    #         metadata["code"] = f"VOL-{i:03d}"
-    #         metadata_dict[metadata["code"]] = metadata
-    #         print(f"Progress: {i}/{end-start} - {metadata['title']}")
-    #     except Exception as e:
-    #         print(f"Error processing {url}: {e}")
-    #         with open("failed_urls.txt", "a") as f:
-    #             f.write(f"{url}\n")
-                
-    # save_metadata(dict(sorted(metadata_dict.items())), "web_video_metadata.json")
-
-
-
-
-    # URLPREFIX = "https://tyingart.com/model/"
-
-    # from metadata import load_metadata, save_metadata
-    # metadata = load_metadata("TYINGART_VID_LATEST.json")
-
-    # model_list = []
-    # for key, value in metadata.items():
-    #     models = value["model"]
-    #     for model in models:
-    #         if model not in model_list:
-    #             model_list.append(model)
-    # model_list = sorted(model_list)
-
-    # print(f"Total models: {len(model_list)}")
-
-    # metadata_dict = {}
-
-    # for model in model_list:
-    #     url = URLPREFIX + model.replace(" ", "-").lower()
-    #     try:
-    #         model_info = model_extract_metadata(url)
-    
-    #         print(f"Processed: {model_info['name']}")
-    #         metadata_dict[model_info["name"]] = model_info
-    #     except Exception as e:
-    #         print(f"Error processing {url}: {e}")
-    #         with open("failed_model_urls.txt", "a") as f:
-    #             f.write(f"{url}\n")
-
-    # save_metadata(dict(sorted(metadata_dict.items())), "tyingart_model_metadata.json")
-
-    from metadata import load_metadata, save_metadata, metadata_sorted
-
-    models = models_etract_metadata("https://tyingart.com/models")
-    models = set(models)
-    models = list(models)
-    models.sort()
-    models.remove("https://www.tyingart.com/model/")
-
-    new = {}
-    for model in models:
-        model_info = model_extract_metadata(model)
-        print(model_info)
-        new[model_info["name"]] = model_info
-
-    save_metadata(metadata_sorted(new), "tyingart_model_metadata.json")
+    # Example usage
+    workflow_spider(
+        website="https://example.com",
+        category="videos",
+        max_page=10,
+        keywords=["/video/"],
+        etype="video",
+        output_file="video_metadata.json"
+    )

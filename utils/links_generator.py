@@ -527,10 +527,10 @@ if __name__ == "__main__":
     # json_path = Path("/home/paulwu/NAS/ty_album_metadata_updated.json")
     # output_dir = Path("/mnt/nas/jellyfin_links/albums")
 
-    json_path = Path("/home/paulwu/NAS/gss_video_metadata.json")
-    output_dir = Path("/mnt/nas/jellyfin_links/bb_videos")
+    json_path = Path("/home/paulwu/NAS/tyingart_model_metadata.json")
+    output_dir = Path("/mnt/nas/jellyfin_links/models")
 
-    entry_type = "video"  # video 或 "album" 或 "model"
+    entry_type = "model"  # video 或 "album" 或 "model"
 
     output_dir.mkdir(parents=True, exist_ok=True)
     with json_path.open(encoding="utf-8") as f:
