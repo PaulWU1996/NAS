@@ -7,3 +7,4 @@
 *.egg-info/
 *.eggs/
 *.json
+.DS_Store
