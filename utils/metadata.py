@@ -255,8 +255,21 @@ if __name__ == "__main__":
     # print(f"共有 {i} 个条目缺少 code 字段")
 
 
-    data = load_metadata("model_metadata.json")
-    new = {}
-    for k, v in data.items():
-        new[v['name']] = v
-    save_metadata(metadata_sorted(new), "model_metadata_updated.json")
+    web = load_metadata("web.json")
+    local = load_metadata("local.json")
+
+    for k in local.keys():
+        if k in web.keys():
+            local[k]["description"] = web[k]
+            local[k]["title"] = web[k]
+   
+    save_metadata(local, "local_updated.json")
+
+    # miss = set(local.keys()) - set(web.keys())
+    # miss = list(miss)
+    # miss_filter = []
+    # for m in miss:
+    #     if m.startswith("WS"):
+    #         continue
+    #     miss_filter.append(m)
+    # print(miss_filter)

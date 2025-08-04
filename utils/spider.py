@@ -9,6 +9,7 @@ import json
 from bs4 import BeautifulSoup
 from metadata import load_metadata, save_metadata, metadata_sorted, model_metadata_template, video_metadata_template, album_metadata_template, img_metadata_template
 import time
+import random
 from requests.exceptions import RequestException
 from functools import wraps
 import logging
@@ -415,27 +416,86 @@ if __name__ == "__main__":
     #             print(f"Found url: {href}")
     #             page_list.append(href)
 
+    # page_list = list(set(page_list))  # Remove duplicates
+
     # with open("syclub_page_list.txt", "w") as f:
     #     for page in page_list:
     #         f.write(f"{page}\n")
 
     from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
     with open("syclub_page_list.txt", "r") as f:
         page_list = f.readlines()
     page_list = [page.strip() for page in page_list if page.strip()]
-    
-    page_list = list(set(page_list))  # Remove duplicates
+
     print(f"Total pages to process: {len(page_list)}")
-    for page in page_list:
-        page_url = page.strip()
-        print(f"Processing page: {page_url}")
-        driver = webdriver.Chrome()
-        driver.get("https://example.com")  # 替换成你的 page_url
+
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+
+    driver = webdriver.Chrome(options=options)
+
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+
+record = {}
+failed_pages = []
+connection_failures = []
+# 设置登录用 Cookie（注意：必须先访问一个同域页面）
+driver.get("https://www.syclub.club")
+driver.add_cookie({
+    'name': 'wordpress_logged_in_2a29f1f47c6d4e333e26cab932bdbf62',
+    'value': 'eagleheart|1755551530|KcHkMIJ0o8IQi5F9xO5P1CxvElqg5ihDzpv2aPhQ4GX|a5504e9c69878e14abf3915a8568e4ed95ef71607429df6cdac5369d347690e4',
+    'domain': 'www.syclub.club'
+})
+for page_url in page_list:
+    try:
+        driver.get(page_url)
         html = driver.page_source
         soup = BeautifulSoup(html, "html.parser")
+    except Exception as e:
+        print(f"❌ Failed to load page: {page_url} -> {e}")
+        connection_failures.append(page_url)
+        continue
 
-        for s in soup.find_all("source"):
-            print(s.get("src"))
-            break
+    video_url = None
+    script_tags = soup.find_all("script")
+    for script in script_tags:
+        if script.string and "video_data" in script.string:
+            match = re.search(r'video_data\s*=\s*(\[\{.*?\}\]);', script.string)
+            if match:
+                try:
+                    video_data = json.loads(match.group(1))
+                    video_url = video_data[0].get("src")
+                    break
+                except Exception as e:
+                    print("⚠️ JSON parse error:", e)
 
-        driver.quit()
+    title_tag = soup.find("title")
+    title_text = title_tag.text if title_tag else ""
+
+    if video_url:
+        print("🎯 Video URL:", video_url)
+    else:
+        print("⚠️ Video URL not found.")
+        failed_pages.append(page_url)
+
+    if title_text:
+        print("📝 Page Title:", title_text)
+
+    if video_url and title_text:
+        record[title_text] = video_url
+        time.sleep(random.uniform(3, 8))
+
+driver.quit()
+save_metadata(record, "syclub_video_metadata.json")
+
+with open("syclub_failed_pages.txt", "w") as f:
+    for url in failed_pages:
+        f.write(url + "\n")
+
+with open("syclub_connection_failures.txt", "w") as f:
+    for url in connection_failures:
+        f.write(url + "\n")
