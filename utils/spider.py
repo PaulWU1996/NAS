@@ -7,7 +7,7 @@ import requests
 import re
 import json
 from bs4 import BeautifulSoup
-from json.TYINGART.web.metadata import load_metadata, save_metadata, metadata_sorted, model_metadata_template, video_metadata_template, album_metadata_template, img_metadata_template
+from metadata import load_metadata, save_metadata, metadata_sorted, model_metadata_template, video_metadata_template, album_metadata_template, img_metadata_template
 import time
 from requests.exceptions import RequestException
 from functools import wraps
@@ -389,11 +389,53 @@ def workflow_spider(website: str,
 
 if __name__ == "__main__":
     # Example usage
-    workflow_spider(
-        website="https://tyingart.com/",
-        category="gallery",
-        max_page= 35,
-        keywords=["/gallery/"],
-        etype="album",
-        output_file="album_metadata.json"
-    )
+    # workflow_spider(
+    #     website="https://tyingart.com/",
+    #     category="gallery",
+    #     max_page= 35,
+    #     keywords=["/gallery/"],
+    #     etype="album",
+    #     output_file="album_metadata.json"
+    # )
+
+    # p = 0
+    # page_list = []
+    # for p in range(1,12):
+    #     page_url = f"https://www.syclub.club/page/{p}?cat&s=%E8%8B%8F%E6%A8%B1"
+    #     html = fetch_with_retry(page_url)
+    #     if not html:
+    #         raise ValueError(f"Failed to connect to {page_url}")
+    #     soup = BeautifulSoup(html, 'html.parser')
+
+    #     for link in soup.find_all("a"):
+    #         href = link.get('href')
+    #         txt = link.text
+
+    #         if str(href).endswith(".html"):
+    #             print(f"Found url: {href}")
+    #             page_list.append(href)
+
+    # with open("syclub_page_list.txt", "w") as f:
+    #     for page in page_list:
+    #         f.write(f"{page}\n")
+
+    from selenium import webdriver
+    with open("syclub_page_list.txt", "r") as f:
+        page_list = f.readlines()
+    page_list = [page.strip() for page in page_list if page.strip()]
+    
+    page_list = list(set(page_list))  # Remove duplicates
+    print(f"Total pages to process: {len(page_list)}")
+    for page in page_list:
+        page_url = page.strip()
+        print(f"Processing page: {page_url}")
+        driver = webdriver.Chrome()
+        driver.get("https://example.com")  # 替换成你的 page_url
+        html = driver.page_source
+        soup = BeautifulSoup(html, "html.parser")
+
+        for s in soup.find_all("source"):
+            print(s.get("src"))
+            break
+
+        driver.quit()

@@ -134,10 +134,8 @@ def handle_album_entry(entry, output_dir, overwrite):
     if poster_source:
         if poster_source.exists():
             if poster_target.exists():
-                if overwrite and not poster_target.is_file():
+                if overwrite:
                     poster_target.unlink()
-                    if poster_target.exists():
-                        poster_target.unlink()
                     os.link(poster_source, poster_target)
                     print(f"♻️ 覆盖写入 poster.jpg")
                 else:
@@ -264,8 +262,10 @@ def generate_movie_nfo_lines(entry: dict) -> list[str]:
                 nfo_lines.append(f"  <genre>{s}</genre>")
     
     
-    prefix = code.split("-")[0]
-    if prefix and prefix != series:
+    prefix = code.split("-")[0] if "-" in code else ""
+    if prefix:
+        if prefix != series:
+            nfo_lines.append(f"  <tag>{prefix}</tag>")
         nfo_lines.append(f"  <tag>{prefix}</tag>")
         nfo_lines.append(f"  <genre>{prefix}</genre>")
 
@@ -353,16 +353,23 @@ def handle_video_entry(entry, output_dir, overwrite):
     if poster_source and poster_source.exists():
         if poster_link.exists():
             if overwrite:
-                if not poster_link.is_file():
+                try:
                     poster_link.unlink()
-                os.link(poster_source, poster_link)
-                # shutil.copyfile(poster_source, poster_link)
-                print(f"♻️ 覆盖写入 poster: {poster_link.name}")
+                except Exception as e:
+                    print(f"⚠️ 无法删除旧 poster 文件: {e}")
+                try:
+                    os.link(poster_source, poster_link)
+                    print(f"♻️ 覆盖写入 poster: {poster_link.name}")
+                except FileExistsError:
+                    print(f"⚠️ poster 覆盖失败，目标已存在: {poster_link}")
             else:
                 print(f"⏭️ 跳过已有 poster: {poster_link.name}")
         else:
-            shutil.copyfile(poster_source, poster_link)
-            print(f"✅ poster复制完成: {poster_link.name}")
+            try:
+                os.link(poster_source, poster_link)
+                print(f"✅ 创建 poster 链接: {poster_link.name}")
+            except Exception as e:
+                print(f"⚠️ 创建 poster 链接失败: {e}")
     else:
         print(f"⚠️ 找不到 poster（尝试 jpg/jpeg 均失败）: {poster_raw}")
         # 使用 ffmpeg 从视频中截取封面图像
@@ -527,10 +534,10 @@ if __name__ == "__main__":
     # json_path = Path("/home/paulwu/NAS/ty_album_metadata_updated.json")
     # output_dir = Path("/mnt/nas/jellyfin_links/albums")
 
-    json_path = Path("/home/paulwu/NAS/tyingart_model_metadata.json")
-    output_dir = Path("/mnt/nas/jellyfin_links/models")
+    json_path = Path("/home/paulwu/NAS/json/TYINGART/local/TYINGART_VID_LATEST.json")
+    output_dir = Path("/mnt/nas/jellyfin_links/videos")
 
-    entry_type = "model"  # video 或 "album" 或 "model"
+    entry_type = "video"  # video 或 "album" 或 "model"
 
     output_dir.mkdir(parents=True, exist_ok=True)
     with json_path.open(encoding="utf-8") as f:

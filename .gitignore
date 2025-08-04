@@ -8,3 +8,8 @@
 *.eggs/
 *.json
 .DS_Store
+/bin
+/lib
+/lib64
+pyvenv.cfg
+*.txt
