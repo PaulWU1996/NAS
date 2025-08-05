@@ -320,7 +320,7 @@ def model_extract_metadata(url: str) -> dict:
         
         return info
 
-def workflow_spider(website: str,
+def workflow_spider_tyingart(website: str,
                     category: str,
                     max_page: int = 50,
                     keywords: list = [],
@@ -387,6 +387,130 @@ def workflow_spider(website: str,
     save_metadata(metadata_sorted(data), output_file)
     print(f"Metadata saved to {output_file}") 
 
+def workflow_spider_syclub(page_url: str,
+                            page_start: int = 1,
+                            page_end: int = 12,
+                            page_list_file: str = "woods_page_list.txt",
+                            name: str = 'wordpress_logged_in_2a29f1f47c6d4e333e26cab932bdbf62',
+                            value: str = 'eagleheart%7C1755602633%7CLDmHswPkRr60fMlNDZ6a7q4nldLbz5Esx54SVNhoqhQ%7C3cd1281000f77ea9ce3247d39516171cce7c6686285b9bcff9602310f9c22780',
+                            connection_failed_file: str = "woods_connection_failures.txt",
+                            failed_pages_file: str = "woods_failed_pages.txt",
+                            metadata_file: str = "woods_video_metadata.json"):
+        """_summary_
+
+        Args:
+            page_url (str): _description_
+            page_start (int, optional): _description_. Defaults to 1.
+            page_end (int, optional): _description_. Defaults to 12.
+            page_list_file (str, optional): _description_. Defaults to "woods_page_list.txt".
+            name (str, optional): _description_. Defaults to 'wordpress_logged_in_2a29f1f47c6d4e333e26cab932bdbf62'.
+            value (str, optional): _description_. Defaults to 'eagleheart%7C1755602633%7CLDmHswPkRr60fMlNDZ6a7q4nldLbz5Esx54SVNhoqhQ%7C3cd1281000f77ea9ce3247d39516171cce7c6686285b9bcff9602310f9c22780'.
+            connection_failed_file (str, optional): _description_. Defaults to "woods_connection_failures.txt".
+            failed_pages_file (str, optional): _description_. Defaults to "woods_failed_pages.txt".
+            metadata_file (str, optional): _description_. Defaults to "woods_video_metadata.json".
+
+        Raises:
+            ValueError: _description_
+        """
+        page_list = []
+        for p in range(page_start,page_end):
+            # page_url = f"https://www.syclub.club/category/uncategorized/%e9%98%bf%e6%9c%a8%e4%bd%9c%e5%93%81/page/{p}"
+            html = fetch_with_retry(page_url)
+            if not html:
+                raise ValueError(f"Failed to connect to {page_url}")
+            soup = BeautifulSoup(html, 'html.parser')
+
+            for link in soup.find_all("a"):
+                href = link.get('href')
+                txt = link.text
+
+                if str(href).endswith(".html"):
+                    print(f"Found url: {href}")
+                    page_list.append(href)
+
+        page_list = list(set(page_list))  # Remove duplicates
+
+        with open(page_list_file, "w") as f:
+            for page in page_list:
+                f.write(f"{page}\n")
+
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
+        with open(page_list_file, "r") as f:
+            page_list = f.readlines()
+        page_list = [page.strip() for page in page_list if page.strip()]
+
+        print(f"Total pages to process: {len(page_list)}")
+
+        options = Options()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+
+        driver = webdriver.Chrome(options=options)
+
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+
+        record = {}
+        failed_pages = []
+        connection_failures = []
+        # 设置登录用 Cookie（注意：必须先访问一个同域页面）
+        driver.get("https://www.syclub.club")
+        driver.add_cookie({
+            'name': 'wordpress_logged_in_2a29f1f47c6d4e333e26cab932bdbf62',
+            'value': 'eagleheart%7C1755602633%7CLDmHswPkRr60fMlNDZ6a7q4nldLbz5Esx54SVNhoqhQ%7C3cd1281000f77ea9ce3247d39516171cce7c6686285b9bcff9602310f9c22780',
+            'domain': 'www.syclub.club'
+        })
+        for page_url in page_list:
+            try:
+                driver.get(page_url)
+                html = driver.page_source
+                soup = BeautifulSoup(html, "html.parser")
+            except Exception as e:
+                print(f"❌ Failed to load page: {page_url} -> {e}")
+                connection_failures.append(page_url)
+                continue
+
+            video_url = None
+            script_tags = soup.find_all("script")
+            for script in script_tags:
+                if script.string and "video_data" in script.string:
+                    match = re.search(r'video_data\s*=\s*(\[\{.*?\}\]);', script.string)
+                    if match:
+                        try:
+                            video_data = json.loads(match.group(1))
+                            video_url = video_data[0].get("src")
+                            break
+                        except Exception as e:
+                            print("⚠️ JSON parse error:", e)
+
+            title_tag = soup.find("title")
+            title_text = title_tag.text if title_tag else ""
+
+            if video_url:
+                print("🎯 Video URL:", video_url)
+            else:
+                print("⚠️ Video URL not found.")
+                failed_pages.append(page_url)
+
+            if title_text:
+                print("📝 Page Title:", title_text)
+
+            if video_url and title_text:
+                record[title_text] = video_url
+                time.sleep(random.uniform(3, 8))
+
+        driver.quit()
+        save_metadata(record, "woods_video_metadata.json")
+
+        with open("woods_failed_pages.txt", "w") as f:
+            for url in failed_pages:
+                f.write(url + "\n")
+
+        with open("woods_connection_failures.txt", "w") as f:
+            for url in connection_failures:
+                f.write(url + "\n")
 
 if __name__ == "__main__":
     # Example usage
@@ -399,32 +523,32 @@ if __name__ == "__main__":
     #     output_file="album_metadata.json"
     # )
 
-    # p = 0
-    # page_list = []
-    # for p in range(1,12):
-    #     page_url = f"https://www.syclub.club/page/{p}?cat&s=%E8%8B%8F%E6%A8%B1"
-    #     html = fetch_with_retry(page_url)
-    #     if not html:
-    #         raise ValueError(f"Failed to connect to {page_url}")
-    #     soup = BeautifulSoup(html, 'html.parser')
 
-    #     for link in soup.find_all("a"):
-    #         href = link.get('href')
-    #         txt = link.text
+    page_list = []
+    for p in range(1,13):
+        page_url = f"https://www.syclub.club/category/uncategorized/%e9%98%bf%e6%9c%a8%e4%bd%9c%e5%93%81/page/{p}"
+        html = fetch_with_retry(page_url)
+        if not html:
+            raise ValueError(f"Failed to connect to {page_url}")
+        soup = BeautifulSoup(html, 'html.parser')
 
-    #         if str(href).endswith(".html"):
-    #             print(f"Found url: {href}")
-    #             page_list.append(href)
+        for link in soup.find_all("a"):
+            href = link.get('href')
+            txt = link.text
 
-    # page_list = list(set(page_list))  # Remove duplicates
+            if str(href).endswith(".html"):
+                print(f"Found url: {href}")
+                page_list.append(href)
 
-    # with open("syclub_page_list.txt", "w") as f:
-    #     for page in page_list:
-    #         f.write(f"{page}\n")
+    page_list = list(set(page_list))  # Remove duplicates
+
+    with open("woods_page_list.txt", "w") as f:
+        for page in page_list:
+            f.write(f"{page}\n")
 
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
-    with open("syclub_page_list.txt", "r") as f:
+    with open("woods_page_list.txt", "r") as f:
         page_list = f.readlines()
     page_list = [page.strip() for page in page_list if page.strip()]
 
@@ -447,7 +571,7 @@ connection_failures = []
 driver.get("https://www.syclub.club")
 driver.add_cookie({
     'name': 'wordpress_logged_in_2a29f1f47c6d4e333e26cab932bdbf62',
-    'value': 'eagleheart|1755551530|KcHkMIJ0o8IQi5F9xO5P1CxvElqg5ihDzpv2aPhQ4GX|a5504e9c69878e14abf3915a8568e4ed95ef71607429df6cdac5369d347690e4',
+    'value': 'eagleheart%7C1755602633%7CLDmHswPkRr60fMlNDZ6a7q4nldLbz5Esx54SVNhoqhQ%7C3cd1281000f77ea9ce3247d39516171cce7c6686285b9bcff9602310f9c22780',
     'domain': 'www.syclub.club'
 })
 for page_url in page_list:
@@ -490,12 +614,12 @@ for page_url in page_list:
         time.sleep(random.uniform(3, 8))
 
 driver.quit()
-save_metadata(record, "syclub_video_metadata.json")
+save_metadata(record, "woods_video_metadata.json")
 
-with open("syclub_failed_pages.txt", "w") as f:
+with open("woods_failed_pages.txt", "w") as f:
     for url in failed_pages:
         f.write(url + "\n")
 
-with open("syclub_connection_failures.txt", "w") as f:
+with open("woods_connection_failures.txt", "w") as f:
     for url in connection_failures:
         f.write(url + "\n")
